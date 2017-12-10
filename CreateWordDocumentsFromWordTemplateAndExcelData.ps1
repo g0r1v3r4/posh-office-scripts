@@ -1,36 +1,37 @@
-﻿<#
+<#
  # Inspired by Scripting Guys blog
  # https://blogs.technet.microsoft.com/heyscriptingguy/2014/09/14/weekend-scripter-manipulating-word-and-excel-with-powershell/
 
- .\CreateWordDocumentsFromWordTemplateAndExcelData.ps1 -pathToSaveWordDocuments C:\Users\G791685\Workspace\posh-office-scripts\myhappydirectory `
-    -pathToDataExcelWorksheet C:\Users\G791685\Workspace\posh-office-scripts\myExcelWorksheet.xlsx `
-    -pathToTemplateWordDocument C:\Users\G791685\Workspace\posh-office-scripts\myWordTemplate.docx `
-    -columnAfind "{{{- FirstName -}}}" `
-    -columnBfind "{{{ Word B }}}"
+ # Usage:
 
+ .\CreateWordDocumentsFromWordTemplateAndExcelData.ps1 -pathToSaveWordDocuments C:\...\directory `
+    -pathToDataExcelWorksheet C:\...\myExcelWorksheet.xlsx `
+    -pathToTemplateWordDocument C:\...\myWordTemplate.docx `
+    -columnAfind "{{{ Search This }}}" `
+    -columnBfind "{{{ Word B Find }}}"
 #>
 
 Param(
 
     [parameter(Mandatory=$true)]
     [string]
-    $pathToSaveWordDocuments = "C:\Users\G791685\Workspace\posh-office-scripts\myhappydirectory\",
+    $pathToSaveWordDocuments = "C:\...\directory",
 
     [parameter(Mandatory=$true)]
     [string]
-    $pathToDataExcelWorksheet = "C:\Users\G791685\Workspace\posh-office-scripts\myExcelWorksheet.xlsx",
+    $pathToDataExcelWorksheet = "C:\...\myExcelWorksheet.xlsx",
 
     [parameter(Mandatory=$true)]
     [string]
-    $pathToTemplateWordDocument = "C:\Users\G791685\Workspace\posh-office-scripts\myWordTemplate.docx",
+    $pathToTemplateWordDocument = "C:\...\myWordTemplate.docx",
 
     [parameter(Mandatory=$true)]
     [string]
-    $columnAfind = "{{{- FirstName -}}}",
+    $columnAfind = "{{{ Search This }}}",
 
     [parameter(Mandatory=$true)]
     [string]
-    $columnBfind = "{{{ Word B }}}"
+    $columnBfind = "{{{ Search That }}}"
 )
 
 function FindAndReplace ($Document, $findtext, $replacewithtext) {
@@ -61,30 +62,37 @@ $Word = New-Object –ComObject Word.Application
 $Word.Visible = $false
 $Workbook = $Excel.workbooks.open($pathToDataExcelWorksheet)
 
-Do {
-    $Row = 2
+# Assuming there is a "header" row
+$Row = 2
 
+Do {
     # Data in column A can be a 'complex' string
     # 'complex' means that there can be multiple values in one cell
     # values will be delimited by ';'
-    $columnAData = $Workbook.Activesheet.Range("A$Row").text -split ";"
+    $columnAData = $Workbook.Activesheet.Range("A$Row").text
+    
+    # Puts a newline and carriage return by replacing the ";" semi-colon
+    # characters in the read string from "A$Row"
+    $editedString = $columnAData.replace(";", "`r`n")
 
     # Data in column B is guaranteed to be a 'simple' string
     # 'simple' means a qualified file name
     $columnBData = $Workbook.Activesheet.Range("B$Row").text
-    
-    $Doc = $Word.documents.open($pathToTemplateWordDocument)
-    
-    FindAndReplace -Document $Doc -findtext $columnAfind -replacewithtext "OMAR`r`nTania`r`n"
-    
-    FindAndReplace -Document $Doc -findtext $columnBfind -replacewithtext $columnBData
+  
+    if($columnBData.length -ne 0){   
+        $Doc = $Word.documents.open($pathToTemplateWordDocument)
 
-    $filename = "$pathToSaveWordDocuments\$columnBData.docx"
-    Write-Host "Saving file to: "
-    $filename
+        FindAndReplace -Document $Doc -findtext $columnAfind -replacewithtext $editedString
+   
+        FindAndReplace -Document $Doc -findtext $columnBfind -replacewithtext $columnBData
 
-    $Doc.saveas([REF]$Filename)
-    $Doc.close()
+        $filename = "$pathToSaveWordDocuments\$columnBData.docx"
+        Write-Host "Saving file to: "
+        $filename
+
+        $Doc.saveas([REF]$Filename)
+        $Doc.close()
+    }
 
     $Row++
 
