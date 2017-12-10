@@ -15,29 +15,20 @@ Param(
 
     [parameter(Mandatory=$true)]
     [string]
-    $pathToTemplateWordDocument = "C:\.....\myWordTemplate.docx"
+    $pathToTemplateWordDocument = "C:\.....\myWordTemplate.docx",
+
+    [parameter(Mandatory=$true)]
+    [string]
+    $columnAfind = "{{{ Word A}}}",
+
+    [parameter(Mandatory=$true)]
+    [string]
+    $columnBfind = "{{{ Word B}}}"
 )
 
-$Excel = New-Object -ComObject Excel.Application
-$Word = New-Object –ComObject Word.Application
-
-function OpenExcelBook ($FileName) {
-    return $Excel.workbooks.open($Filename)
-}
-
-function CloseExcelBook ($Workbook) {
-    #$Workbook.save()
-    $Workbook.close()
-}
-
-function ReadCellData ($Workbook, $Cell) {
-    $Worksheet = $Workbook.Activesheet
-    return $Worksheet.Range($Cell).text
-}
-
-function SearchAWord ($Document, $findtext, $replacewithtext) {
+function FindAndReplace ($Document, $findtext, $replacewithtext) {
   $FindReplace=$Document.ActiveWindow.Selection.Find
-  $matchCase = $false;
+  $matchCase = $true;
   $matchWholeWord = $true;
   $matchWildCards = $false;
   $matchSoundsLike = $false;
@@ -58,48 +49,32 @@ function SearchAWord ($Document, $findtext, $replacewithtext) {
                         $matchAlefHamza, $matchControl)
 }
 
-function SaveAsWordDoc ($Document, $FileName) {
-    $Document.Saveas([REF]$Filename)
-    $Document.close()
-}
+$Excel = New-Object -ComObject Excel.Application
+$Word = New-Object –ComObject Word.Application
 
-function OpenWordDoc ($Filename) {
-    return $Word.documents.open($Filename)
-}
+$Workbook = $Excel.workbooks.open($pathToDataExcelWorksheet)
 
-function OutPut () {
-    $Workbook = OpenExcelBook –Filename $pathToDataExcelWorksheet
-
+Do {
     $Row = 2
-
-    Do {
-
-        $Data = ReadCellData -Workbook $Workbook -Cell "A$Row"
-        Write-Host $Data
-        $FirstName = $Data
-
-
-        If ($Data.length –ne 0) {
-            $Doc = OpenWordDoc -Filename $pathToTemplateWordDocument
-            SearchAWord -Document $Doc -findtext '{{{- FirstName -}}}' -replacewithtext $Data
-
-            $Data = ReadCellData -Workbook $Workbook -Cell "B$Row"
-            $LastName = $Data
-            SearchAWord -Document $Doc -findtext '{{{- LastName -}}}' -replacewithtext $Data
-
-            $SaveName="$pathToSaveWordDocuments\$LastName.docx"
-
-            Write-Host $SaveName
-            SaveAsWordDoc –document $Doc –Filename $SaveName
-
-            $Row++
-        }
-
-    } while ($Data.length -ne 0)
-
+    $columnAData = $Workbook.Activesheet.Range("A$Row").text
+    $columnBData = $Workbook.Activesheet.Range("B$Row").text
     
-    CloseExcelBook –workbook $Workbook
-    return $cellData
-}
+    $Doc = $Word.documents.open($pathToTemplateWordDocument)
 
-OutPut
+    FindAndReplace -Document $Doc -findtext $columnAfind -replacewithtext $columnAData
+    FindAndReplace -Document $Doc -findtext $columnBfind -replacewithtext $columnBData
+
+    $filename = "$pathToSaveWordDocuments\$columnBData.docx"
+    Write-Host "Saving file to: "
+    $filename
+
+    $Doc.saveas([REF]$Filename)
+    $Doc.close()
+
+    $Row++
+
+} while (($columnAData.Length –ne 0) -and ($columnBData.Length -ne 0))
+
+$Workbook.close()
+$Word.quit()
+$Excel.quit()
